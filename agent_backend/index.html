@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <title>金融分析看板</title>
+</head>
+<body class="bg-gray-50 flex h-screen font-sans">
+    <nav class="w-72 bg-white border-r shadow-sm p-6 overflow-y-auto">
+        <h1 class="text-xl font-bold mb-8 text-gray-800 border-b pb-4">分析报告列表</h1>
+        <div id="sidebar" class="space-y-2"></div>
+    </nav>
+    <main class="flex-1 p-12 overflow-y-auto">
+        <div id="content" class="bg-white p-10 rounded-xl shadow-sm border border-gray-100 prose prose-slate max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold">欢迎使用金融分析看板</h2>
+            <p class="text-gray-600">请点击左侧列表查看具体的报告内容。</p>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        async function init() {
+            try {
+                const res = await fetch(API_BASE + '/api/reports');
+                const data = await res.json();
+                const sidebar = document.getElementById('sidebar');
+                
+                data.reports.forEach(file => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-blue-50 hover:text-blue-700 text-gray-600";
+                    btn.textContent = file.replace('.txt', '').replace('.md', '');
+                    btn.onclick = () => loadFile(file);
+                    sidebar.appendChild(btn);
+                });
+            } catch (e) {
+                document.getElementById('sidebar').innerHTML = '<p class="text-red-500 text-sm">后端服务未启动或连接失败</p>';
+            }
+        }
+
+        async function loadFile(name) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = '<p class="text-gray-400">加载中...</p>';
+            try {
+                const res = await fetch(API_BASE + '/api/reports/' + encodeURIComponent(name));
+                const data = await res.json();
+                contentDiv.innerHTML = marked.parse(data.content);
+            } catch (e) {
+                contentDiv.innerHTML = '<p class="text-red-500">无法读取该文件</p>';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
