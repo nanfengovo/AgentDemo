@@ -20,3 +20,6 @@ dist/
 # Python
 __pycache__/
 *.pyc
+
+# Database
+*.db

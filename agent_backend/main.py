@@ -3,8 +3,10 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 
+from fastapi.responses import StreamingResponse
+
 # 把我们刚刚写好的 Agent 大脑导进来
-from core_agent.brain import run_agent
+from core_agent.brain import run_agent, run_agent_stream
 
 app = FastAPI()
 
@@ -21,6 +23,14 @@ def chat_with_agent(request: ChatRequest):
     final_reply = run_agent(request.message,request.session_id)
     
     return {"status": "success", "reply": final_reply}
+
+@app.post("/chat/stream")
+def chat_with_agent_stream(request: ChatRequest):
+    """跟 Agent 聊天的流式输出 (SSE) 通道"""
+    return StreamingResponse(
+        run_agent_stream(request.message, request.session_id),
+        media_type="text/event-stream"
+    )
 
 if __name__ == "__main__":
     # 在 8000 端口启动服务器！
