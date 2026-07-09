@@ -16,5 +16,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("⚠️ 严重警告：未找到 GEMINI_API_KEY，请确保项目根目录下存在 .env 文件并且已经配置！")
 
-# 统一维护模型请求 URL
-URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+# 动态拼接模型请求 URL
+def get_model_url(model: str = "gemini-3.1-flash-lite") -> str:
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"

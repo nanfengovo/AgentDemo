@@ -8,9 +8,9 @@ from core_agent.agent_state import AgentState
 from .planner import generate_plan
 from .reflector import check_quality
 
-from .config import URL
+from .config import get_model_url
 
-def run_agent(user_message:str,session_id:str="default_user") -> str:
+def run_agent(user_message:str, session_id:str="default_user", model:str="gemini-3.1-flash-lite", images:list=None) -> str:
     """
     Agent 的核心大脑：运行完整的ReAct (思考 - 调用 - 观察) 循环
     """
@@ -19,12 +19,24 @@ def run_agent(user_message:str,session_id:str="default_user") -> str:
 
     print(f"\n [Agent中枢] 收到新任务：{user_message}")
     print(f" [Planner] 正在拆解任务，生成执行计划...")
-    state.plan = generate_plan(user_message)
+    state.plan = generate_plan(user_message, model)
     plan_text = "\n".join([f" - {step}" for step in state.plan])
     print(f" [Planner] 计划生成完毕:\n{plan_text}\n\n开始深度思考...")
 
     # 1,记忆初始化：把用户说的话用标准的JSON存入列表
-    state.history_messages.append({"role":"user","parts":[{"text":user_message}]})
+    user_parts = [{"text": user_message}]
+    if images:
+        for img in images:
+            if img.startswith("data:"):
+                header, base64_data = img.split(",", 1)
+                mime_type = header.split(":")[1].split(";")[0]
+                user_parts.append({
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": base64_data
+                    }
+                })
+    state.history_messages.append({"role":"user","parts": user_parts})
 
     print(f"\n [Agent大脑] 收到新任务：{user_message}\n开始深度思考...")
 
@@ -56,7 +68,8 @@ def run_agent(user_message:str,session_id:str="default_user") -> str:
         }
 
         # 发送网络请求给Gemini
-        response = requests.post(URL,json=payload)
+        url = get_model_url(model)
+        response = requests.post(url, json=payload)
         res_data = response.json()
 
         # 架构师防坑设计：先检查大模型 API 是否报错了
@@ -100,7 +113,7 @@ def run_agent(user_message:str,session_id:str="default_user") -> str:
             draft_answer = ai_part.get("text", "")
             
             print(f"\n [Reflector] 正在对报告草稿进行严格的质量自检...")
-            reflect_result = check_quality(draft_answer, state.goal)
+            reflect_result = check_quality(draft_answer, state.goal, model)
             
             if reflect_result.upper().startswith("PASS"):
                 print(f" [Reflector] 质量自检通过！(PASS)")
@@ -121,7 +134,7 @@ def run_agent(user_message:str,session_id:str="default_user") -> str:
     save_history(session_id, state.history_messages)
     return f"系统保护：Agent 已达到最大思考次数 ({state.max_iterations})，已被强制终止。"
 
-def run_agent_stream(user_message:str, session_id:str="default_user"):
+def run_agent_stream(user_message:str, session_id:str="default_user", model:str="gemini-3.1-flash-lite", images:list=None):
     """
     流式输出版本的 Agent 大脑
     """
@@ -129,11 +142,24 @@ def run_agent_stream(user_message:str, session_id:str="default_user"):
 
     yield f"data: [Agent中枢] 收到新任务：{user_message}\n\n"
     yield f"data: [Planner] 正在拆解任务，生成执行计划...\n\n"
-    state.plan = generate_plan(user_message)
+    state.plan = generate_plan(user_message, model)
     plan_text = "\n".join([f" - {step}" for step in state.plan])
-    yield f"data: [Planner] 计划生成完毕:\n{plan_text}\n\n"
+    safe_plan = plan_text.replace('\n', '\\n')
+    yield f"data: [Planner] 计划生成完毕:\\n{safe_plan}\n\n"
 
-    state.history_messages.append({"role":"user","parts":[{"text":user_message}]})
+    user_parts = [{"text": user_message}]
+    if images:
+        for img in images:
+            if img.startswith("data:"):
+                header, base64_data = img.split(",", 1)
+                mime_type = header.split(":")[1].split(";")[0]
+                user_parts.append({
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": base64_data
+                    }
+                })
+    state.history_messages.append({"role":"user","parts": user_parts})
 
     while state.iteration_count < state.max_iterations:
         state.iteration_count += 1
@@ -157,7 +183,8 @@ def run_agent_stream(user_message:str, session_id:str="default_user"):
         }
 
         yield f"data: [Agent大脑] 🧠 正在深入思考...\n\n"
-        response = requests.post(URL, json=payload)
+        url = get_model_url(model)
+        response = requests.post(url, json=payload)
         res_data = response.json()
 
         if "error" in res_data:
@@ -187,7 +214,7 @@ def run_agent_stream(user_message:str, session_id:str="default_user"):
             draft_answer = ai_part.get("text", "")
             
             yield f"data: [Reflector] 🧐 正在对报告草稿进行严格的质量自检...\n\n"
-            reflect_result = check_quality(draft_answer, state.goal)
+            reflect_result = check_quality(draft_answer, state.goal, model)
             
             if reflect_result.upper().startswith("PASS"):
                 yield f"data: [Reflector] 🌟 质量自检通过！\n\n"
@@ -195,11 +222,14 @@ def run_agent_stream(user_message:str, session_id:str="default_user"):
                 state.final_answer = draft_answer
                 save_history(session_id, state.history_messages)
                 
-                # 最终报告输出
-                yield f"data: [最终报告]\n{state.final_answer}\n\n"
+                # 最终报告输出：分为两个 chunk，第一个触发前端状态机切换，第二个传输安全转义的内容
+                safe_final = state.final_answer.replace('\n', '\\n')
+                yield f"data: [最终报告]\n\n"
+                yield f"data: {safe_final}\n\n"
                 return
             else:
-                yield f"data: [Reflector] ❌ 质量不达标，已被打回重写！原因：{reflect_result}\n\n"
+                safe_reflect = reflect_result.replace('\n', '\\n')
+                yield f"data: [Reflector] ❌ 质量不达标，已被打回重写！原因：\\n{safe_reflect}\n\n"
                 state.history_messages.append({
                     "role": "user",
                     "parts": [{"text": f"你的报告被质检员打回！质检反馈如下：\n{reflect_result}\n请重新修改生成终版报告！"}]

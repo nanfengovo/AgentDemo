@@ -2,7 +2,7 @@ import requests
 import json
 import os
 
-from .config import URL
+from .config import get_model_url
 
 REFLECT_PROMPT = """
 你是一个智能且严格的质量审核员。
@@ -26,13 +26,14 @@ REFLECT_PROMPT = """
 如果存在缺陷，请无情地指出具体问题并要求重写。
 """
 
-def check_quality(draft_answer: str, goal: str) -> str:
+def check_quality(draft_answer: str, goal: str, model: str = "gemini-3.1-flash-lite") -> str:
     """调用大模型对草稿进行动态自检"""
     payload = {
         "contents": [{"role": "user", "parts": [{"text": REFLECT_PROMPT.format(draft_answer=draft_answer, goal=goal)}]}]
     }
     try:
-        response = requests.post(URL, json=payload)
+        url = get_model_url(model)
+        response = requests.post(url, json=payload)
         res_data = response.json()
         
         if "error" in res_data:

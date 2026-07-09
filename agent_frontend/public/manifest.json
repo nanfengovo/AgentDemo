@@ -1,0 +1,16 @@
+{
+  "name": "QuantTrading Agent",
+  "short_name": "QuantAgent",
+  "description": "Cross-platform terminal for QuantTrading Agent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

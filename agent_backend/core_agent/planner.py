@@ -2,7 +2,7 @@ import requests
 import json
 import os
 
-from .config import URL
+from .config import get_model_url
 
 PLAN_PROMPT = """
 你是一个顶级的 AI 任务拆解规划专家。
@@ -23,13 +23,14 @@ PLAN_PROMPT = """
 ```
 """
 
-def generate_plan(goal: str) -> list:
+def generate_plan(goal: str, model: str = "gemini-3.1-flash-lite") -> list:
     """调用大模型生成任务计划（纯文本输出 JSON）"""
     payload = {
         "contents": [{"role": "user", "parts": [{"text": PLAN_PROMPT.format(goal=goal)}]}]
     }
     try:
-        response = requests.post(URL, json=payload)
+        url = get_model_url(model)
+        response = requests.post(url, json=payload)
         res_data = response.json()
         
         if "error" in res_data:
