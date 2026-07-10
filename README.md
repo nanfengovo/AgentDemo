@@ -28,11 +28,33 @@ The system operates on a highly decoupled dual-node architecture, engineered for
   <img src="assets/architecture.jpg" alt="QuantTrading Agent System Architecture" width="100%" />
 </div>
 
-### 🧩 The Agent Core (ReAct Engine)
-- **Agent 中枢 (Brain)**: The central orchestration unit. It manages conversation history, maintains context, and dynamically decides whether to call external tools or formulate a final response.
-- **规划器 (Planner)**: When the Brain receives a complex goal, the Planner breaks it down into actionable, sequential steps.
-- **审核员 (Reflector)**: A strict quality assurance node. It evaluates the drafted report for quantitative strictness, ensuring scores are firmly bounded between 0-100 and no vague "maybe" advice is given.
-- **调度中心 (Tool Router)**: Safely dispatches physical tools (market data fetchers via `yfinance`, file I/O operations, and terminal bash execution).
+### 🧩 Core Components Deep Dive
+
+This system goes far beyond simple API wrapping. It is a complete, self-governing lifecycle engine built from scratch with capabilities for planning, self-reflection, physical execution, and multi-platform response. Here is a detailed breakdown of the core building blocks:
+
+#### 1. 🧠 Agent Brain (`core_agent/brain.py`)
+**Architecture**: The central orchestration unit based on a native **ReAct (Reason + Act)** loop mechanism.
+*   **State Machine Loop**: It employs a rigorous `while` loop (with a maximum iteration safety valve) to continuously parse LLM outputs. If the model triggers a `functionCall`, the Brain intercepts it, routes it to the Tool Router for execution, and forces the physical result back into the memory context for the next reasoning cycle. If the model outputs plain text, the Brain determines that the reasoning phase is complete and transitions to the Quality Assurance (Reflector) phase.
+*   **Streaming Engine (SSE)**: To ensure a premium user experience, the `run_agent_stream` utilizes Python's `yield` generators. It translates every micro-state of the Planner, Tool Router, and LLM (e.g., `[Tool Router] Executing...`) into real-time Server-Sent Events (SSE) data streams, pushing them seamlessly to the Frontend and Feishu.
+
+#### 2. 🗺️ Planner (`core_agent/planner.py`)
+**Architecture**: Responsible for **dimensional reduction and goal breakdown** of complex tasks.
+*   Feeding a massive financial query directly to an LLM often causes logical hallucinations. The Planner acts as a prerequisite node, prompting the LLM for macroscopic thinking to break the goal into linear, structured JSON steps (e.g., `1. Extract Ticker -> 2. Fetch Fundamentals -> 3. Fetch Technicals -> 4. Cross-Verify`). This checklist is then "injected" into subsequent system prompts, acting as a strict GPS for the Agent's reasoning path.
+
+#### 3. 🧐 Reflector (`core_agent/reflector.py`)
+**Architecture**: A ruthlessly strict **Post-Generation QA Node**.
+*   **Adversarial Mechanism**: LLMs naturally tend to write evasive, ambiguous advice (e.g., *"This stock has risks but may also rise, exercise caution"*). The Reflector intercepts the draft report and forces the LLM to act as an auditor to grade the draft.
+*   **Reject & Rewrite**: If the report lacks a definitive `0-100` quantitative score or contains ambiguous conclusions, the Reflector returns `FAIL` along with modification directives. The Brain then feeds this critique (e.g., "Your report was rejected! It must contain a precise stop-loss price") back to the LLM, forcing it to rewrite until the Reflector outputs `PASS`.
+
+#### 4. 🔧 Tool Router (`core_agent/tool_router.py` & `tool_schema.py`)
+**Architecture**: Safely dispatches and executes physical "weapons."
+*   **Declarative Schema**: Capabilities (like `get_stock_price` or `search_local_files`) are strictly defined in `tool_schema.py` using the exact JSON Schema formats mandated by Google Gemini.
+*   **Decoupled Dispatcher**: `tool_router.py` uses a dynamic dictionary mapping for request dispatching. When the LLM expresses an intent to call a function, the Router captures the exact function name and arguments, triggers the actual local Python script (e.g., fetching NASDAQ data via `yfinance` in `finance_tools.py`), and packages the cleaned data or caught errors back to the model.
+
+#### 5. 🔔 Feishu Synergy Matrix (`feishu_service.py` & `main.py`)
+**Architecture**: The system extends beyond the Web UI, integrating deeply with Feishu's OpenAPI to achieve powerful IM-based office automation.
+*   **Bidirectional Async Webhooks**: The FastAPI backend handles Feishu enterprise bot event subscriptions via `/feishu/callback`. It leverages FastAPI's `BackgroundTasks` to offload heavy quant calculations, ensuring the webhook returns a `200 OK` within Feishu's strict 3-second timeout window.
+*   **Rich Interactive Cards**: Abandoning basic plain text, it innovatively serializes the LLM's CoT progress and final Markdown reports into Feishu's exclusive **Interactive Message Cards**. This allows for dynamic rendering of syntax highlights and structured layouts directly within the chat window.
 
 ## ✨ Core Features & Tech Stack
 
