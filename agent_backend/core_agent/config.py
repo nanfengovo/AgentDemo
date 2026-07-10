@@ -8,7 +8,7 @@ if os.path.exists(env_path):
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 # 现在可以安全地拿到了
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 1. 先导入底层的物理工具
 from tools.finance_tools import get_stock_price, get_fundamental_factors, get_technical_factors
 from tools.file_tools import write_flie, read_flie
+from tools.notification_tools import push_to_feishu
 
 # 2. 封装需要特殊处理的包装函数 (Wrapper)
 def write_flie_wrapper(path: str, content: str) -> str:
@@ -31,7 +32,8 @@ TOOL_REGISTRY = {
     "get_technical_factors": get_technical_factors,
     "read_flie": read_flie,
     "write_flie": write_flie_wrapper,
-    "run_terminal_command": run_terminal_command_wrapper
+    "run_terminal_command": run_terminal_command_wrapper,
+    "push_to_feishu": push_to_feishu
 }
 
 def dispatch_tool(function_name: str, args: dict) -> str:

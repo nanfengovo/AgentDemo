@@ -69,6 +69,17 @@ tools_declaration = {
                 },
                 "required": ["command"]
             }
+        },
+        {
+            "name": "push_to_feishu",
+            "description": "向指定的飞书群聊推送重要信息、分析报告或告警通知。如果你认为你的分析结果对用户非常有价值，或者你需要主动提醒用户，请使用此工具。",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "message": {"type": "STRING", "description": "要推送到飞书的具体文本内容，支持 Markdown 格式"}
+                },
+                "required": ["message"]
+            }
         }
 
     ]
