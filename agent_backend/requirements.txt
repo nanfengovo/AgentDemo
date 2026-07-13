@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+requests
+yfinance
+python-dotenv
+urllib3<2
