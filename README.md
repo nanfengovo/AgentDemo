@@ -8,7 +8,9 @@ An open-source, full-stack Quant Trading AI Agent platform built with Python and
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Gemini](https://img.shields.io/badge/Gemini_API-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Gemini](https://img.shields.io/badge/Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+[![DeepSeek](https://img.shields.io/badge/DeepSeek-4D90FE?style=for-the-badge&logo=ai&logoColor=white)](https://deepseek.com/)
 
 [English](README.md) | [中文](README_zh.md)
 
@@ -56,6 +58,11 @@ This system goes far beyond simple API wrapping. It is a complete, self-governin
 *   **Bidirectional Async Webhooks**: The FastAPI backend handles Feishu enterprise bot event subscriptions via `/feishu/callback`. It leverages FastAPI's `BackgroundTasks` to offload heavy quant calculations, ensuring the webhook returns a `200 OK` within Feishu's strict 3-second timeout window.
 *   **Rich Interactive Cards**: Abandoning basic plain text, it innovatively serializes the LLM's CoT progress and final Markdown reports into Feishu's exclusive **Interactive Message Cards**. This allows for dynamic rendering of syntax highlights and structured layouts directly within the chat window.
 
+#### 6. 🔌 Universal LLM Adapter (`core_agent/llm_adapter.py`)
+**Architecture**: The crucial bridge enabling true multi-model freedom.
+*   **Decoupling Engine**: It normalizes internal system state (using the industry-standard OpenAI format) and translates payloads on-the-fly to the specific requirements of Google Gemini, OpenAI, or DeepSeek APIs. 
+*   **Dynamic Injection**: Supports real-time API Key and Base URL injection from the frontend Settings Modal. This allows users to switch underlying models instantly via the UI without restarting the backend.
+
 ## ✨ Core Features & Tech Stack
 
 <details open>
@@ -69,8 +76,8 @@ Seamlessly paste (Ctrl+V) or upload K-line charts, screenshots of financial repo
 </details>
 
 <details open>
-<summary><b>3. 🔄 Dynamic Multi-Model Routing</b></summary>
-The terminal supports hot-swapping between the Gemini 3.5 Pro, Flash, and Lite models mid-conversation. Use the high-speed Lite model for simple queries, and seamlessly switch to Pro for heavy fundamental deep dives.
+<summary><b>3. 🔄 Universal Multi-Model Support</b></summary>
+The terminal supports hot-swapping between different model providers mid-conversation via the UI Settings panel. Use <b>DeepSeek v4/R1</b> for advanced reasoning, <b>OpenAI GPT-4o</b> for robust analysis, or <b>Gemini Flash</b> for high-speed queries. Inject custom API Keys and proxy Base URLs directly from the web interface.
 </details>
 
 <details open>
@@ -101,8 +108,11 @@ uv venv
 source .venv/bin/activate
 uv pip install fastapi uvicorn requests yfinance
 
-# 2. Configure your Gemini API Key
-echo "GEMINI_API_KEY=your_api_key_here" > .env
+# 2. Configure your API Keys (Choose at least one provider)
+echo "GEMINI_API_KEY=your_gemini_key_here" > .env
+echo "OPENAI_API_KEY=your_openai_key_here" >> .env
+echo "DEEPSEEK_API_KEY=your_deepseek_key_here" >> .env
+echo "OPENAI_BASE_URL=https://api.openai.com/v1" >> .env
 
 # 3. Start the server
 uv run --with fastapi --with uvicorn --with requests --with yfinance main.py
@@ -127,7 +137,8 @@ npm run dev
 ## 🛣 Roadmap
 
 - [x] **Agent Core Engine**: Custom Planner, Brain, and Reflector implementation
-- [x] **Streaming UI**: SSE streaming with foldable CoT visualization
+- [x] **Universal Model Adapter**: Native support for OpenAI, DeepSeek, and Gemini formats
+- [x] **Streaming UI**: SSE streaming with foldable CoT visualization & Settings Modal
 - [x] **Financial Tools**: Basic fundamental and technical data fetchers
 - [x] **Multimodal**: Chart image parsing and lightbox
 - [ ] **Long-term Memory**: Vector Database integration to store user risk profiles

@@ -8,7 +8,9 @@
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Gemini](https://img.shields.io/badge/Gemini_API-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Gemini](https://img.shields.io/badge/Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+[![DeepSeek](https://img.shields.io/badge/DeepSeek-4D90FE?style=for-the-badge&logo=ai&logoColor=white)](https://deepseek.com/)
 
 [English](README.md) | [中文](README_zh.md)
 
@@ -56,6 +58,11 @@
 *   **双向监听与异步处理**：在 FastAPI 中通过 `/feishu/callback` 处理飞书企业机器人的事件订阅。利用 FastAPI 的 `BackgroundTasks` 将耗时的量化计算直接扔到后台执行，确保飞书 Webhook 3秒内返回 200，避免超时重试风暴。
 *   **富文本动态卡片**：彻底抛弃了简陋的纯文本回复，创新性地将大模型生成的思考进度与最终 Markdown 报告，通过 JSON 序列化组装成飞书专属的 **互动消息卡片 (Interactive Message Card)**。它能动态渲染高亮色块、结构化排版，在聊天窗口内提供降维打击般的专业阅读体验。
 
+#### 6. 🔌 通用大模型适配器 (LLM Adapter) - `core_agent/llm_adapter.py`
+**构建原理**：实现多模型自由切换的核心桥梁。
+*   **架构解耦引擎**：在系统内部使用行业标准的 OpenAI 格式维护上下文状态，并在发送请求时，动态将其翻译为 Google Gemini、OpenAI 或 DeepSeek API 所要求的特定格式。
+*   **动态参数注入**：支持直接从前端界面的“设置”面板中，热更新 API Key 和 Base URL。用户无需重启后端服务，即可在不同厂商的模型之间瞬间切换。
+
 ## ✨ 核心特性与技术栈
 
 <details open>
@@ -69,8 +76,8 @@
 </details>
 
 <details open>
-<summary><b>3. 🔄 动态多模型热切换</b></summary>
-平台支持在一次会话中随时在 Gemini 3.5 Pro、Flash 和 Lite 模型间无缝热切换。使用极速的 Lite 模型处理简单查询，遇到深度的基本面剖析时，瞬间切回 Pro 模型。
+<summary><b>3. 🔄 跨厂商动态多模型热切换</b></summary>
+平台支持在一次会话中，通过 UI 设置面板随时在不同厂商的大模型间无缝切换。你可以使用 <b>DeepSeek v4/R1</b> 进行极其复杂的深度逻辑推演，切换至 <b>OpenAI GPT-4o</b> 获取稳健的综合分析，或者使用 <b>Gemini Flash</b> 处理极速的轻量化查询。
 </details>
 
 <details open>
@@ -101,8 +108,11 @@ uv venv
 source .venv/bin/activate
 uv pip install fastapi uvicorn requests yfinance
 
-# 2. 配置你的 Gemini API Key
-echo "GEMINI_API_KEY=你的_api_key_放在这里" > .env
+# 2. 配置你的 API Key (可以配置多个厂商的 Key)
+echo "GEMINI_API_KEY=你的_gemini_key" > .env
+echo "OPENAI_API_KEY=你的_openai_key" >> .env
+echo "DEEPSEEK_API_KEY=你的_deepseek_key" >> .env
+echo "OPENAI_BASE_URL=https://api.openai.com/v1" >> .env
 
 # 3. 启动服务器
 uv run --with fastapi --with uvicorn --with requests --with yfinance main.py
@@ -127,7 +137,8 @@ npm run dev
 ## 🛣 演进路线图
 
 - [x] **Agent 核心引擎**: 原生定制 Planner、Brain 和 Reflector 模块
-- [x] **流式交互 UI**: 基于 SSE 的可折叠思维链 (CoT) 可视化实现
+- [x] **通用模型适配器**: 原生支持 OpenAI、DeepSeek 与 Gemini 的架构解耦
+- [x] **流式交互 UI**: 基于 SSE 的可折叠思维链 (CoT) 可视化与动态设置面板
 - [x] **金融兵器库**: 基础的基本面和技术面数据获取工具
 - [x] **多模态能力**: 终端图片上传、粘贴与 Lightbox 沉浸解析
 - [ ] **长期记忆 (Memory)**: 接入向量数据库，构建用户的专属风险画像

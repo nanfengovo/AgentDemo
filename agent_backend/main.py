@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 # 把我们刚刚写好的 Agent 大脑导进来
 from core_agent.brain import run_agent, run_agent_stream
+import core_agent.config # 显式导入 config，触发 .env 文件加载机制
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,14 +34,84 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "user_123"
     model: str = "gemini-3.1-flash-lite"
+    api_key: str = None
+    base_url: str = None
     images: list = [] # 存放 base64 格式的图片数据
+    enable_finance: bool = True
+    enable_search: bool = False
+
+class FolderRequest(BaseModel):
+    name: str
+
+class SessionTitleRequest(BaseModel):
+    title: str
+
+class SessionFolderRequest(BaseModel):
+    folder_id: str
+
+class ModelsRequest(BaseModel):
+    api_key: str = None
+    base_url: str = None
+
+@app.post("/models")
+def get_available_models(request: ModelsRequest):
+    import requests
+    models = []
+    
+    # 1. 尝试获取 Gemini 模型
+    gemini_key = request.api_key or os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            res = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}", timeout=5)
+            if res.status_code == 200:
+                for m in res.json().get("models", []):
+                    model_name = m["name"].replace("models/", "")
+                    # 排除纯音频输出的 TTS 模型，避免 The requested combination of response modalities (TEXT) is not supported 错误
+                    if "tts" in model_name.lower() or "audio" in model_name.lower():
+                        continue
+                    
+                    if "generateContent" in m.get("supportedGenerationMethods", []) or "predict" in m.get("supportedGenerationMethods", []):
+                        models.append(model_name)
+        except Exception:
+            pass
+            
+    # 2. 尝试获取 OpenAI 兼容接口的模型（如 DeepSeek, OpenAI, Groq 等）
+    openai_key = request.api_key or os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
+    
+    # 智能判断默认代理地址
+    default_url = "https://api.deepseek.com" if (not request.api_key and not os.getenv("OPENAI_API_KEY") and os.getenv("DEEPSEEK_API_KEY")) else "https://api.openai.com/v1"
+    openai_url = request.base_url or os.getenv("OPENAI_BASE_URL", default_url)
+    
+    if openai_key:
+        try:
+            headers = {"Authorization": f"Bearer {openai_key}"}
+            res = requests.get(f"{openai_url.rstrip('/')}/models", headers=headers, timeout=5)
+            if res.status_code == 200:
+                for m in res.json().get("data", []):
+                    models.append(m["id"])
+        except Exception:
+            pass
+            
+    # 3. 添加免费高质量开源生图模型
+    models.append("black-forest-labs/FLUX.1-schnell")
+    models.append("siliconflow/FLUX.1-schnell")
+            
+    # 如果都失败或为空，则返回默认备用列表
+    if not models:
+        models = [
+            "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-1.5-pro", "gemini-1.5-flash",
+            "gpt-4o", "deepseek-chat", "deepseek-reasoner"
+        ]
+        
+    return {"status": "success", "models": list(set(models))}
+
 
 @app.post("/chat")
 def chat_with_agent(request: ChatRequest):
     """跟 Agent 聊天的专属网络通道"""
     
     # 核心只有这一行：把用户的消息喂给大脑，等它在后台循环思考，拿到最终答案！
-    final_reply = run_agent(request.message, request.session_id, request.model, request.images)
+    final_reply = run_agent(request.message, request.session_id, request.model, request.images, request.api_key, request.base_url, request.enable_finance, request.enable_search)
     
     return {"status": "success", "reply": final_reply}
 
@@ -48,9 +119,39 @@ def chat_with_agent(request: ChatRequest):
 def chat_with_agent_stream(request: ChatRequest):
     """跟 Agent 聊天的流式输出 (SSE) 通道"""
     return StreamingResponse(
-        run_agent_stream(request.message, request.session_id, request.model, request.images),
+        run_agent_stream(request.message, request.session_id, request.model, request.images, request.api_key, request.base_url, request.enable_finance, request.enable_search),
         media_type="text/event-stream"
     )
+
+from memory.persistent import get_folders, create_folder, get_sessions, update_session_folder, update_session_title, get_history
+
+@app.get("/folders")
+def api_get_folders():
+    return {"status": "success", "folders": get_folders()}
+
+@app.post("/folders")
+def api_create_folder(req: FolderRequest):
+    folder_id = create_folder(req.name)
+    return {"status": "success", "folder_id": folder_id}
+
+@app.get("/sessions")
+def api_get_sessions():
+    return {"status": "success", "sessions": get_sessions()}
+
+@app.get("/sessions/{session_id}")
+def api_get_session_history(session_id: str):
+    history = get_history(session_id)
+    return {"status": "success", "history": history}
+
+@app.post("/sessions/{session_id}/title")
+def api_update_session_title(session_id: str, req: SessionTitleRequest):
+    update_session_title(session_id, req.title)
+    return {"status": "success"}
+
+@app.post("/sessions/{session_id}/folder")
+def api_update_session_folder(session_id: str, req: SessionFolderRequest):
+    update_session_folder(session_id, req.folder_id)
+    return {"status": "success"}
 
 from feishu_service import reply_to_feishu_user, reply_to_feishu_card
 
@@ -132,5 +233,5 @@ async def feishu_callback(request: Request, background_tasks: BackgroundTasks):
     return {"status": "success"}
 
 if __name__ == "__main__":
-    # 在 8000 端口启动服务器！
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # 在 8000 端口启动服务器，开启 reload=True 实现代码热更新！
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

@@ -12,10 +12,9 @@ if os.path.exists(env_path):
 
 # 现在可以安全地拿到了
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
-if not GEMINI_API_KEY:
-    print("⚠️ 严重警告：未找到 GEMINI_API_KEY，请确保项目根目录下存在 .env 文件并且已经配置！")
-
-# 动态拼接模型请求 URL
-def get_model_url(model: str = "gemini-3.1-flash-lite") -> str:
-    return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+if not GEMINI_API_KEY and not OPENAI_API_KEY and not DEEPSEEK_API_KEY:
+    print("⚠️ 严重警告：未找到任何大模型的 API_KEY，请确保在前端设置或配置了 .env 文件！")

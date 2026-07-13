@@ -1,8 +1,5 @@
-import requests
 import json
-import os
-
-from .config import get_model_url
+from .llm_adapter import call_llm
 
 REFLECT_PROMPT = """
 你是一个智能且严格的质量审核员。
@@ -26,22 +23,18 @@ REFLECT_PROMPT = """
 如果存在缺陷，请无情地指出具体问题并要求重写。
 """
 
-def check_quality(draft_answer: str, goal: str, model: str = "gemini-3.1-flash-lite") -> str:
+def check_quality(draft_answer: str, goal: str, model: str = "gemini-3.1-flash-lite", api_key: str = None, base_url: str = None) -> str:
     """调用大模型对草稿进行动态自检"""
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": REFLECT_PROMPT.format(draft_answer=draft_answer, goal=goal)}]}]
-    }
+    messages = [{"role": "user", "content": REFLECT_PROMPT.format(draft_answer=draft_answer, goal=goal)}]
+    
     try:
-        url = get_model_url(model)
-        response = requests.post(url, json=payload)
-        res_data = response.json()
+        response = call_llm(messages, model=model, api_key=api_key, base_url=base_url)
         
-        if "error" in res_data:
-            print(f"❌ [Reflector] API 报错: {res_data['error']}")
+        if response.error:
+            print(f"❌ [Reflector] API 报错: {response.error}")
             return "PASS" # 如果接口报错，默认放行防止系统卡死
             
-        text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        return text
+        return response.text.strip()
         
     except Exception as e:
         print(f"❌ [Reflector] 审核过程异常失败: {e}")

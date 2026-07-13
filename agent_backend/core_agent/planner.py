@@ -1,8 +1,5 @@
-import requests
 import json
-import os
-
-from .config import get_model_url
+from .llm_adapter import call_llm
 
 PLAN_PROMPT = """
 你是一个顶级的 AI 任务拆解规划专家。
@@ -23,24 +20,20 @@ PLAN_PROMPT = """
 ```
 """
 
-def generate_plan(goal: str, model: str = "gemini-3.1-flash-lite") -> list:
+def generate_plan(goal: str, model: str = "gemini-3.1-flash-lite", api_key: str = None, base_url: str = None) -> list:
     """调用大模型生成任务计划（纯文本输出 JSON）"""
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": PLAN_PROMPT.format(goal=goal)}]}]
-    }
+    messages = [{"role": "user", "content": PLAN_PROMPT.format(goal=goal)}]
+    
     try:
-        url = get_model_url(model)
-        response = requests.post(url, json=payload)
-        res_data = response.json()
+        response = call_llm(messages, model=model, api_key=api_key, base_url=base_url)
         
-        if "error" in res_data:
-            print(f"❌ [Planner] API 报错: {res_data['error']}")
+        if response.error:
+            print(f"❌ [Planner] API 报错: {response.error}")
             return ["按默认流程直接执行任务"]
             
-        text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+        text = response.text.strip()
         
         # 清理可能存在的 markdown 标记
-        text = text.strip()
         if text.startswith("```json"):
             text = text[7:]
         elif text.startswith("```"):
